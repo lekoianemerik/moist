@@ -1,6 +1,6 @@
 <div
-  id="card-{{ plant.id }}"
-  hx-get="/api/plant/{{ plant.id }}"
+  id="card-{{ plant.plant_id }}"
+  hx-get="/api/plant/{{ plant.plant_id }}"
   hx-trigger="every 30s"
   hx-swap="outerHTML"
   class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-stone-800 dark:bg-stone-900"
@@ -8,10 +8,10 @@
   <!-- Header: emoji + name + status badge -->
   <div class="mb-3 flex items-start justify-between">
     <div class="flex items-center gap-2">
-      <span class="text-2xl">{{ plant.plant_emoji }}</span>
+      <span class="text-2xl">&#x1f331;</span>
       <div>
-        <h3 class="font-semibold leading-tight">{{ plant.name }}</h3>
-        <p class="text-xs text-stone-500 dark:text-stone-400">{{ plant.location }}</p>
+        <h3 class="font-semibold leading-tight">{{ plant.plant_name }}</h3>
+        <p class="text-xs text-stone-500 dark:text-stone-400">{{ plant.plant_position }}</p>
       </div>
     </div>
     <span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ plant.status.text }} {{ plant.status.bg }}">
@@ -23,12 +23,12 @@
   <div class="mb-3">
     <div class="mb-1 flex items-baseline justify-between">
       <span class="text-sm text-stone-500 dark:text-stone-400">Moisture</span>
-      <span class="text-xl font-bold tabular-nums">{{ "%.1f" | format(plant.latest.moisture) }}%</span>
+      <span class="text-xl font-bold tabular-nums">{{ "%.1f" | format(plant.latest.moisture_pct) }}%</span>
     </div>
     <div class="h-2 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
       <div
         class="h-full rounded-full transition-all {{ plant.bar_color }}"
-        style="width: {{ [plant.latest.moisture, 100] | min }}%"
+        style="width: {{ [plant.latest.moisture_pct, 100] | min }}%"
       ></div>
     </div>
     <div class="mt-0.5 flex justify-between text-[10px] text-stone-400 dark:text-stone-600">

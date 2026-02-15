@@ -2,22 +2,20 @@
 
 Soil humidity monitoring system for houseplants. Tracks moisture levels, battery status, and predicts when each plant needs watering.
 
-See [project-overview.md](project-overview.md) for the full aspirational design (hardware, MQTT pipeline, Supabase schema, deployment plan).
-
 ## Current status
 
 **Hardware:** Ordered, awaiting delivery (ESP32s, capacitive sensors, Raspberry Pi, batteries).
 
-**Web dashboard:** Built and running locally with mock data. Not yet deployed.
+**Web dashboard:** Wired to Supabase with auth. Ready to deploy to Railway.
 
 | Component | Status |
 |-----------|--------|
-| Web dashboard (FastAPI + HTMX) | Working locally with mock data |
-| Supabase database | Not set up yet |
-| Supabase Auth (login) | Not started |
+| Web dashboard (FastAPI + HTMX) | Done -- reads from Supabase, login-protected |
+| Supabase database (schema + seed data) | Done -- `supabase/schema.sql` ready to run |
+| Supabase Auth (email/password login) | Done -- cookie-based sessions, JWKS verification |
+| Railway deployment | Ready -- `railway.toml` configured, needs env vars |
 | MQTT pipeline (fake sensors) | Not started |
 | Raspberry Pi ingest service | Not started |
-| Railway deployment | Not deployed yet |
 | ESP32 firmware | Waiting for hardware |
 
 ## Tech stack
@@ -26,29 +24,35 @@ See [project-overview.md](project-overview.md) for the full aspirational design 
 |-------|-----------|
 | Web framework | FastAPI (Python) |
 | Templates | Jinja2 |
-| Interactivity | HTMX (auto-refreshing plant cards) |
+| Interactivity | HTMX (auto-refreshing plant cards every 30s) |
 | Styling | Tailwind CSS (CDN) |
-| Database | Supabase (Postgres) — not wired up yet |
-| Hosting | Railway (free tier) — not deployed yet |
+| Database | Supabase (Postgres) |
+| Auth | Supabase Auth (email/password, asymmetric JWT) |
+| Hosting | Railway (auto-deploy from GitHub) |
 
 ## Project structure
 
 ```
 moist/
 ├── README.md                  # You are here
-├── project-overview.md        # Full project design and aspirational plan
+├── project-overview.md        # Full aspirational design (hardware, MQTT, predictions)
+├── architecture.md            # Data model, auth flow, deployment architecture
+├── supabase/
+│   └── schema.sql             # DDL + seed data + dummy readings (run in SQL Editor)
 └── web/                       # FastAPI web dashboard
-    ├── main.py                # App entry point (3 routes)
-    ├── mock_data.py           # 4 fake plants with 7-day generated history
+    ├── main.py                # Routes + auth middleware (6 endpoints)
+    ├── db.py                  # Supabase clients, data models, queries
     ├── requirements.txt       # Python dependencies
-    ├── Procfile               # Railway start command
-    ├── railway.toml           # Railway config
+    ├── railway.toml           # Railway deployment config
+    ├── runtime.txt            # Python 3.12
     ├── .env                   # Supabase credentials (git-ignored)
+    ├── .env.example           # Documents required env vars
     ├── templates/
-    │   ├── base.html          # Layout with Tailwind + HTMX CDN
-    │   ├── dashboard.html     # Main dashboard page
+    │   ├── base.html          # Layout: Tailwind CDN, HTMX CDN, dark mode
+    │   ├── login.html         # Login page (pre-auth screen)
+    │   ├── dashboard.html     # Main page: summary bar + plant card grid
     │   └── partials/
-    │       └── plant_card.html  # Individual plant card
+    │       └── plant_card.html  # Individual plant card (HTMX-swappable)
     └── static/
         └── favicon.ico
 ```
@@ -60,16 +64,42 @@ cd web
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
+
+```bash
+cp .env.example .env
+# Edit .env with your SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY
+```
+
+Before the first run, go to the Supabase SQL Editor and run `supabase/schema.sql` to create tables and seed data. Then create one user in the Supabase dashboard (Authentication > Users > Add User).
+
+```bash
 uvicorn main:app --reload
 ```
 
-Open http://localhost:8000 to see the dashboard with 4 mock plants.
+Open http://localhost:8000 -- you'll be redirected to the login page.
+
+## Deploying to Railway
+
+1. Push to GitHub
+2. Go to [railway.app](https://railway.app), sign in with GitHub
+3. New Project > Deploy from GitHub Repo > select "moist"
+4. Set Root Directory to `web` in service settings
+5. Settings > Networking > Generate Domain
+6. Add environment variables in the Variables tab:
+   - `SUPABASE_URL`
+   - `SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SECRET_KEY`
+
+Railway auto-deploys on every push to `main`. The `.env` file is git-ignored; Railway uses its own Variables tab instead.
 
 ## What's next
 
-1. Create Supabase project and run the database schema (see project-overview.md Section 5)
-2. Wire the dashboard to Supabase (replace mock data with real queries)
-3. Add login with Supabase Auth
-4. Deploy to Railway
-5. Set up MQTT pipeline with fake sensors for end-to-end testing
-6. When hardware arrives: flash ESP32s, calibrate sensors, go live
+1. Deploy to Railway
+2. Set up MQTT pipeline with fake sensors for end-to-end testing
+3. Add watering prediction logic and countdown display
+4. When hardware arrives: flash ESP32s, calibrate sensors, go live
+
+See [project-overview.md](project-overview.md) for the full aspirational design and [architecture.md](architecture.md) for technical details.

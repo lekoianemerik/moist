@@ -1,6 +1,6 @@
 # 🌱 Soil Humidity Monitor — Project Overview
 
-**Status:** Hardware ordered, awaiting delivery
+**Status:** Web dashboard wired to Supabase, ready for Railway deploy. Hardware on order.
 **Location:** Ireland
 **Last updated:** February 2026
 
@@ -32,12 +32,12 @@ We're building an end-to-end plant monitoring system from scratch. A capacitive 
 
 **Core features:**
 
-- Per-plant moisture % with configurable thresholds per plant type
-- 7-day sparkline history per sensor
-- Watering prediction based on rolling average moisture decay rate
+- Per-plant moisture % with configurable thresholds
+- 7-day sparkline history per sensor (server-rendered SVG)
+- Watering prediction based on rolling average moisture decay rate (planned)
 - Battery level monitoring per sensor node
 - Automatic watering event detection (sudden moisture spike)
-- Login-protected dashboard (Supabase Auth)
+- Login-protected dashboard (Supabase Auth, asymmetric JWT via JWKS)
 - Future: Telegram/email alerts when a plant drops below threshold
 
 ---
@@ -120,7 +120,7 @@ void loop() {
 
 ### Stage 2 — ESP32 → MQTT → Raspberry Pi (hardware required)
 
-Add Wi-Fi and MQTT to the ESP32 sketch. The ESP32 publishes a JSON payload to a topic like `home/plants/{sensor-id}/moisture`.
+Add Wi-Fi and MQTT to the ESP32 sketch. The ESP32 publishes a JSON payload to a topic like `home/plants/{sensor_id}/moisture`.
 
 ```cpp
 // Pseudo-code for the full loop
@@ -128,7 +128,7 @@ void loop() {
   wakeFromDeepSleep();
   connectWiFi();
   readSensor();
-  publishMQTT("home/plants/sensor-01/moisture", "{\"moisture\": 52.3, \"battery\": 87, \"raw\": 1842}");
+  publishMQTT("home/plants/1/moisture", "{\"moisture\": 52.3, \"battery\": 87, \"raw\": 1842}");
   disconnectWiFi();
   enterDeepSleep(30 * 60);  // 30 minutes
 }
@@ -137,14 +137,14 @@ void loop() {
 **MQTT topic structure:**
 
 ```
-home/plants/sensor-01/moisture  →  {"moisture": 52.3, "battery": 87, "raw": 1842}
-home/plants/sensor-02/moisture  →  {"moisture": 38.1, "battery": 63, "raw": 2104}
+home/plants/1/moisture  →  {"moisture": 52.3, "battery": 87, "raw": 1842}
+home/plants/2/moisture  →  {"moisture": 38.1, "battery": 63, "raw": 2104}
 ...
 ```
 
 ### Stage 3 — Raspberry Pi → Supabase (can test NOW)
 
-A Python service on the Pi subscribes to `home/plants/+/moisture`, processes each message, and inserts it into Supabase via its REST API.
+A Python service on the Pi subscribes to `home/plants/+/moisture`, processes each message, and inserts it into Supabase via its REST API. Uses the secret key (bypasses RLS) for server-side inserts.
 
 ```python
 # ingest.py — runs on the Raspberry Pi
@@ -152,16 +152,16 @@ import json, os
 import paho.mqtt.client as mqtt
 from supabase import create_client
 
-supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"])
 
 def on_message(client, userdata, msg):
-    sensor_id = msg.topic.split("/")[2]
+    sensor_id = int(msg.topic.split("/")[2])
     data = json.loads(msg.payload)
     supabase.table("readings").insert({
         "sensor_id": sensor_id,
-        "moisture": data["moisture"],
+        "moisture_raw": data["raw"],
+        "moisture_pct": data["moisture"],
         "battery": data.get("battery"),
-        "raw_value": data.get("raw"),
     }).execute()
 
 client = mqtt.Client()
@@ -171,9 +171,9 @@ client.subscribe("home/plants/+/moisture")
 client.loop_forever()
 ```
 
-### Stage 4 — Supabase → FastAPI Dashboard (can test NOW)
+### Stage 4 — Supabase → FastAPI Dashboard (DONE)
 
-The dashboard queries Supabase for the latest reading per plant and recent history. See Section 5 for full details.
+The dashboard queries Supabase for the latest reading per plant and 7-day history. See `web/db.py` for the query implementation and [architecture.md](architecture.md) for the full data flow.
 
 ---
 
@@ -206,10 +206,10 @@ import json, time, random
 import paho.mqtt.client as mqtt
 
 SENSORS = [
-    {"id": "sensor-01", "name": "Kitchen Basil",    "type": "basil",     "moisture": 55, "battery": 87},
-    {"id": "sensor-02", "name": "Bathroom Fern",    "type": "fern",      "moisture": 65, "battery": 63},
-    {"id": "sensor-03", "name": "Desk Succulent",   "type": "succulent", "moisture": 20, "battery": 94},
-    {"id": "sensor-04", "name": "Balcony Tomato",   "type": "tomato",    "moisture": 48, "battery": 41},
+    {"id": 1, "name": "Kitchen Basil",    "moisture": 55, "battery": 87},
+    {"id": 2, "name": "Bathroom Fern",    "moisture": 65, "battery": 63},
+    {"id": 3, "name": "Desk Succulent",   "moisture": 20, "battery": 94},
+    {"id": 4, "name": "Balcony Tomato",   "moisture": 48, "battery": 41},
 ]
 
 client = mqtt.Client()
@@ -249,9 +249,9 @@ import json
 import paho.mqtt.client as mqtt
 
 def on_message(client, userdata, msg):
-    sensor_id = msg.topic.split("/")[2]
+    sensor_id = int(msg.topic.split("/")[2])
     data = json.loads(msg.payload)
-    print(f"[{sensor_id}] moisture={data['moisture']}% battery={data.get('battery')}%")
+    print(f"[sensor {sensor_id}] moisture={data['moisture']}% battery={data.get('battery')}%")
     # TODO: insert into Supabase here (see Section 3, Stage 3)
 
 client = mqtt.Client()
@@ -271,7 +271,7 @@ You can also test individual messages without the Python script:
 mosquitto_sub -t "home/plants/#" -v
 
 # Terminal 2 — publish a single fake reading
-mosquitto_pub -t "home/plants/sensor-01/moisture" \
+mosquitto_pub -t "home/plants/1/moisture" \
   -m '{"moisture": 42.5, "battery": 91, "raw": 2435}'
 ```
 
@@ -293,10 +293,10 @@ pip install paho-mqtt supabase
 | Templates | **Jinja2** | Server-side HTML rendering, included with FastAPI |
 | Interactivity | **HTMX** | SPA-like dynamic updates without writing JavaScript |
 | Styling | **Tailwind CSS** (CDN) | Fast iteration, zero build steps |
-| Auth | **Supabase Auth** (future) | Free, handles email/password + magic links |
+| Auth | **Supabase Auth** | Email/password login, asymmetric JWT verified via JWKS |
 | Database | **Supabase (Postgres)** | Free tier: 500MB, REST API, realtime subscriptions |
 | Charts | **Inline SVGs** (server-generated) | Sparklines built in Python, no JS charting library |
-| Hosting | **Railway** (free tier) | $0/month with $1 credit, no cold starts, auto-deploy from GitHub |
+| Hosting | **Railway** | Auto-deploy from GitHub, env vars via dashboard |
 
 ### Why FastAPI + HTMX instead of Next.js?
 
@@ -307,110 +307,26 @@ pip install paho-mqtt supabase
 
 ### Supabase schema
 
-```sql
--- Run this in Supabase SQL Editor
+The full DDL (tables, indexes, views, seed data, dummy readings, RLS) is in `supabase/schema.sql`. See [architecture.md](architecture.md) for the data model design.
 
-create table plants (
-  id            text primary key,           -- matches sensor_id e.g. 'sensor-01'
-  name          text not null,              -- 'Kitchen Basil'
-  location      text,                       -- 'Kitchen windowsill'
-  plant_type    text not null,              -- 'basil', 'fern', 'succulent', 'tomato'
-  ideal_min     integer not null default 40,
-  ideal_max     integer not null default 60,
-  water_below   integer not null default 30,
-  avg_daily_drop real not null default 8.0,
-  created_at    timestamptz default now()
-);
+Key design decisions:
 
-create table readings (
-  id          bigint generated always as identity primary key,
-  sensor_id   text references plants(id) not null,
-  moisture    real not null,
-  battery     real,
-  raw_value   integer,
-  recorded_at timestamptz default now()
-);
+- **Sensor and plant are separate tables** — a sensor can be reassigned to a different plant without losing history.
+- **Append-only with timestamps** — plants and sensors tables are never updated. A new row with a fresh timestamp represents the current config. Views (`current_plants`, `current_sensors`) always return the latest row per ID.
+- **Both raw and calibrated readings** — `moisture_raw` (ADC value) and `moisture_pct` (0–100%) are stored so recalibration doesn't retroactively change historical data.
+- **Integer IDs** — `plant_id` and `sensor_id` are integers (1, 2, 3, 4), not strings.
 
--- Index for fast dashboard queries
-create index idx_readings_sensor_time on readings (sensor_id, recorded_at desc);
+### HTMX auto-refresh pattern
 
--- Seed with our 4 test plants
-insert into plants (id, name, location, plant_type, ideal_min, ideal_max, water_below, avg_daily_drop) values
-  ('sensor-01', 'Kitchen Basil',    'Kitchen windowsill', 'basil',     40, 60, 30, 8.0),
-  ('sensor-02', 'Bathroom Fern',    'Bathroom shelf',     'fern',      60, 80, 50, 6.0),
-  ('sensor-03', 'Desk Succulent',   'Office desk',        'succulent', 10, 25, 10, 3.0),
-  ('sensor-04', 'Balcony Tomato',   'Balcony planter',    'tomato',    50, 70, 35, 10.0);
+Each plant card includes an HTMX attribute that polls its own endpoint every 30 seconds. The server returns a fresh HTML fragment and HTMX swaps it in — no full page reload, no JavaScript state management:
 
--- Row-level security (RLS) — lock it down
-alter table plants enable row level security;
-alter table readings enable row level security;
-
-create policy "Authenticated users can read plants"
-  on plants for select
-  to authenticated
-  using (true);
-
-create policy "Authenticated users can read readings"
-  on readings for select
-  to authenticated
-  using (true);
-
-create policy "Service role can insert readings"
-  on readings for insert
-  to service_role
-  with check (true);
+```html
+<div hx-get="/api/plant/1" hx-trigger="every 30s" hx-swap="outerHTML">
+  <!-- plant card content rendered by Jinja2 -->
+</div>
 ```
 
-### Project structure
-
-```
-web/
-├── main.py                    # FastAPI app, routes, startup
-├── mock_data.py               # Fake plants & readings (replaced by Supabase later)
-├── requirements.txt           # fastapi, uvicorn, jinja2, python-dotenv
-├── Procfile                   # Start command for Railway
-├── railway.toml               # Railway deployment config
-├── .env                       # SUPABASE_URL, SUPABASE_KEY (git-ignored)
-├── templates/
-│   ├── base.html              # Layout: Tailwind CDN, HTMX CDN, dark mode
-│   ├── dashboard.html         # Main page: summary bar + plant card grid
-│   └── partials/
-│       └── plant_card.html    # Single plant card (HTMX-swappable)
-└── static/
-    └── favicon.ico
-```
-
-### Key dashboard queries (Python + Supabase SDK)
-
-```python
-# queries.py — to be added when Supabase is wired up
-from supabase import create_client
-import os
-
-supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-
-def get_plants_with_latest_reading():
-    """Get all plants with their most recent reading."""
-    result = supabase.table("plants").select(
-        "*, readings(moisture, battery, raw_value, recorded_at)"
-    ).order(
-        "recorded_at", desc=True, foreign_table="readings"
-    ).limit(1, foreign_table="readings").execute()
-    return result.data
-
-def get_plant_history(sensor_id: str, days: int = 7):
-    """Get 7-day reading history for a specific plant."""
-    from datetime import datetime, timedelta, timezone
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    result = supabase.table("readings").select(
-        "moisture, battery, recorded_at"
-    ).eq("sensor_id", sensor_id).gte(
-        "recorded_at", since
-    ).order("recorded_at", desc=False).execute()
-    return result.data
-```
-
-### Watering prediction logic
+### Watering prediction logic (planned)
 
 ```python
 # predictions.py — to be added
@@ -438,7 +354,7 @@ def predict_days_until_watering(
     if hours_elapsed < 1:
         return -1
 
-    moisture_drop = first["moisture"] - last["moisture"]
+    moisture_drop = first["moisture_pct"] - last["moisture_pct"]
     drop_per_hour = moisture_drop / hours_elapsed
 
     if drop_per_hour <= 0:
@@ -448,53 +364,43 @@ def predict_days_until_watering(
     return round(hours_remaining / 24, 1)
 ```
 
-### HTMX auto-refresh pattern
+### Dashboard routes
 
-Each plant card includes an HTMX attribute that polls its own endpoint every 30 seconds. The server returns a fresh HTML fragment and HTMX swaps it in — no full page reload, no JavaScript state management:
-
-```html
-<div hx-get="/api/plant/sensor-01" hx-trigger="every 30s" hx-swap="outerHTML">
-  <!-- plant card content rendered by Jinja2 -->
-</div>
-```
+| Route | Method | Auth | Purpose |
+|-------|--------|------|---------|
+| `/login` | GET | No | Login page |
+| `/login` | POST | No | Authenticate, set session cookie |
+| `/logout` | POST | No | Clear session, redirect to login |
+| `/` | GET | Yes | Main dashboard — all plant cards |
+| `/api/plant/{plant_id}` | GET | Yes | Single plant card partial (HTMX) |
+| `/health` | GET | No | Healthcheck for Railway |
 
 ### Deploy to Railway
 
-```bash
-# 1. Push to GitHub
-cd moist
-git remote add origin https://github.com/YOU/moist.git
-git push -u origin main
+1. Push to GitHub
+2. Go to railway.app, sign in with GitHub
+3. New Project → Deploy from GitHub Repo → select "moist"
+4. Set Root Directory to `web` in service settings
+5. Settings → Networking → Generate Domain
+6. Add environment variables in the Variables tab:
+   - `SUPABASE_URL`
+   - `SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SECRET_KEY`
 
-# 2. Go to railway.app, sign in with GitHub
-# 3. New Project → Deploy from GitHub Repo → select "moist"
-# 4. Set Root Directory to "web" in service settings
-# 5. Settings → Networking → Generate Domain
-# 6. Add env vars SUPABASE_URL and SUPABASE_KEY (when ready)
-```
-
-### Dashboard routes
-
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/` | GET | Main dashboard — renders all plant cards |
-| `/api/plant/{id}` | GET | Single plant card partial (HTMX refresh) |
-| `/health` | GET | Healthcheck for Railway |
-| `/login` | GET/POST | Login form with Supabase Auth (future) |
-| `/settings` | GET/POST | Manage plants, thresholds, sensors (future) |
+The `.env` file is git-ignored. Railway injects env vars from its dashboard at runtime.
 
 ---
 
-## What to Do Next (No Hardware Needed)
+## What to Do Next
 
-| Priority | Task | Time Est. |
-|----------|------|-----------|
-| ~~1~~ | ~~Build dashboard UI with mock data~~ | ~~done~~ |
-| 2 | Create Supabase project, run the SQL schema above | 15 min |
-| 3 | Wire dashboard to Supabase (replace mock_data.py with real queries) | 1–2 hrs |
-| 4 | Add Supabase Auth for login-protected dashboard | 1–2 hrs |
-| 5 | Install Mosquitto locally, run `fake_sensors.py` and `ingest.py` | 30 min |
-| 6 | Connect `ingest.py` to Supabase so fake readings flow into the DB | 30 min |
-| 7 | Add watering prediction logic and countdown display | 1 hr |
-| 8 | Deploy to Railway | 15 min |
-| 9 | **When hardware arrives:** flash ESP32s, calibrate sensors, swap fake publisher for real nodes | 1–2 hrs |
+| Priority | Task | Status |
+|----------|------|--------|
+| ~~1~~ | ~~Build dashboard UI with mock data~~ | Done |
+| ~~2~~ | ~~Create Supabase project, run the SQL schema~~ | Done (`supabase/schema.sql`) |
+| ~~3~~ | ~~Wire dashboard to Supabase (replace mock data with real queries)~~ | Done (`web/db.py`) |
+| ~~4~~ | ~~Add Supabase Auth for login-protected dashboard~~ | Done (email/password, JWKS) |
+| 5 | Deploy to Railway | Ready — push to GitHub and configure |
+| 6 | Install Mosquitto locally, run `fake_sensors.py` and `ingest.py` | Not started |
+| 7 | Connect `ingest.py` to Supabase so fake readings flow into the DB | Not started |
+| 8 | Add watering prediction logic and countdown display | Not started |
+| 9 | **When hardware arrives:** flash ESP32s, calibrate sensors, go live | Waiting for delivery |

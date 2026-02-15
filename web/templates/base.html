@@ -12,6 +12,13 @@
     }
   </script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script>
+    document.addEventListener("htmx:responseError", function (e) {
+      if (e.detail.xhr.status === 401) {
+        window.location.href = "/login";
+      }
+    });
+  </script>
 </head>
 <body class="min-h-full bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100 font-sans antialiased">
   {% block content %}{% endblock %}

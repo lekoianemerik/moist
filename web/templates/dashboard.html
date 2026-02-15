@@ -4,13 +4,23 @@
 <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
   <!-- Header -->
-  <div class="mb-8">
-    <h1 class="text-3xl font-bold tracking-tight">
-      &#x1f331; moist
-    </h1>
-    <p class="mt-1 text-sm text-stone-500 dark:text-stone-400">
-      Soil humidity monitor &mdash; {{ plants | length }} plants tracked
-    </p>
+  <div class="mb-8 flex items-start justify-between">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">
+        &#x1f331; moist
+      </h1>
+      <p class="mt-1 text-sm text-stone-500 dark:text-stone-400">
+        Soil humidity monitor &mdash; {{ plants | length }} plants tracked
+      </p>
+    </div>
+    <form method="post" action="/logout">
+      <button type="submit"
+        class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600
+               transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400
+               dark:hover:bg-stone-800">
+        Sign out
+      </button>
+    </form>
   </div>
 
   <!-- Summary bar -->
@@ -36,7 +46,7 @@
 
   <!-- Footer -->
   <p class="mt-8 text-center text-xs text-stone-400 dark:text-stone-600">
-    Showing mock data &mdash; connect Supabase to see real sensor readings
+    Live sensor data from Supabase
   </p>
 
 </div>
