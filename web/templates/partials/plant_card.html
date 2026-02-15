@@ -41,7 +41,7 @@
   <!-- Sparkline -->
   <div class="mb-3">
     <p class="mb-1 text-xs text-stone-500 dark:text-stone-400">7-day trend</p>
-    {{ generate_sparkline_svg(plant.history, color=plant.sparkline_color) }}
+    {{ generate_sparkline_svg(plant.history, color=plant.sparkline_color) | safe }}
   </div>
 
   <!-- Footer: battery + last updated -->

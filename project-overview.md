@@ -8,7 +8,7 @@
 
 ## 1. Idea Overview
 
-We're building an end-to-end plant monitoring system from scratch. A capacitive soil moisture sensor in each plant pot feeds an analog signal to a battery-powered ESP32 microcontroller, which wakes every 15–30 minutes, takes a reading, publishes it over Wi-Fi via MQTT, then goes back to deep sleep. A Raspberry Pi on the local network runs Mosquitto (MQTT broker) and a small Python service that processes incoming readings and pushes them to a cloud Postgres database (Supabase). A Next.js web app on Vercel provides a login-protected dashboard where you can see each plant's current moisture level, historical trends, and a prediction of when it will next need watering.
+We're building an end-to-end plant monitoring system from scratch. A capacitive soil moisture sensor in each plant pot feeds an analog signal to a battery-powered ESP32 microcontroller, which wakes every 15–30 minutes, takes a reading, publishes it over Wi-Fi via MQTT, then goes back to deep sleep. A Raspberry Pi on the local network runs Mosquitto (MQTT broker) and a small Python service that processes incoming readings and pushes them to a cloud Postgres database (Supabase). A Python web app (FastAPI + HTMX) on Railway provides a login-protected dashboard where you can see each plant's current moisture level, historical trends, and a prediction of when it will next need watering.
 
 ```
 ┌──────────────┐    analog    ┌───────────┐    Wi-Fi/MQTT    ┌──────────────┐
@@ -25,8 +25,8 @@ We're building an end-to-end plant monitoring system from scratch. A capacitive 
                                                                     │ REST API
                                                                     ▼
                                                              ┌──────────────┐
-                                                             │   Next.js    │
-                                                             │  on Vercel   │
+                                                             │   FastAPI    │
+                                                             │  on Railway  │
                                                              └──────────────┘
 ```
 
@@ -171,7 +171,7 @@ client.subscribe("home/plants/+/moisture")
 client.loop_forever()
 ```
 
-### Stage 4 — Supabase → Next.js Dashboard (can test NOW)
+### Stage 4 — Supabase → FastAPI Dashboard (can test NOW)
 
 The dashboard queries Supabase for the latest reading per plant and recent history. See Section 5 for full details.
 
@@ -283,18 +283,27 @@ pip install paho-mqtt supabase
 
 ---
 
-## 5. UI with Next.js on Vercel
+## 5. Web Dashboard with FastAPI on Railway
 
 ### Tech stack
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
-| Framework | **Next.js 14+ (App Router)** | Server components, API routes, easy Vercel deploy |
-| Styling | **Tailwind CSS** | Fast iteration, no CSS files to manage |
-| Auth | **Supabase Auth** | Free, handles email/password + magic links, JWT tokens |
+| Framework | **FastAPI** (Python) | Server-rendered HTML, API endpoints, familiar language |
+| Templates | **Jinja2** | Server-side HTML rendering, included with FastAPI |
+| Interactivity | **HTMX** | SPA-like dynamic updates without writing JavaScript |
+| Styling | **Tailwind CSS** (CDN) | Fast iteration, zero build steps |
+| Auth | **Supabase Auth** (future) | Free, handles email/password + magic links |
 | Database | **Supabase (Postgres)** | Free tier: 500MB, REST API, realtime subscriptions |
-| Charts | **Recharts** or lightweight inline SVGs | Sparklines, moisture history |
-| Hosting | **Vercel** (free tier) | Zero-config Next.js deploys from GitHub |
+| Charts | **Inline SVGs** (server-generated) | Sparklines built in Python, no JS charting library |
+| Hosting | **Railway** (free tier) | $0/month with $1 credit, no cold starts, auto-deploy from GitHub |
+
+### Why FastAPI + HTMX instead of Next.js?
+
+- **100% Python** — same language as the Raspberry Pi ingest service, no JavaScript/TypeScript needed
+- **Zero build steps** — no npm, no Node.js, no webpack. Just Python + HTML templates
+- **HTMX for interactivity** — individual plant cards auto-refresh via server-rendered HTML fragments, no React/Vue needed
+- **Railway over Vercel** — predictable free tier with no surprise billing, no cold starts
 
 ### Supabase schema
 
@@ -355,159 +364,137 @@ create policy "Service role can insert readings"
 ### Project structure
 
 ```
-plant-monitor/
-├── app/
-│   ├── layout.tsx              # Root layout, fonts, Supabase provider
-│   ├── page.tsx                # Redirect to /dashboard or /login
-│   ├── login/
-│   │   └── page.tsx            # Login form (Supabase Auth)
-│   └── dashboard/
-│       ├── page.tsx            # Main dashboard (server component)
-│       ├── plant-card.tsx      # Individual plant card (client component)
-│       ├── detail-panel.tsx    # Selected plant detail view
-│       ├── sparkline.tsx       # SVG sparkline chart
-│       └── moisture-gauge.tsx  # Semi-circle gauge
-├── lib/
-│   ├── supabase-server.ts      # Server-side Supabase client
-│   ├── supabase-browser.ts     # Browser-side Supabase client
-│   ├── plant-profiles.ts       # Plant type definitions & thresholds
-│   └── predictions.ts          # Watering prediction logic
-├── middleware.ts                # Auth redirect (protect /dashboard)
-├── tailwind.config.ts
-├── package.json
-└── .env.local                  # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+web/
+├── main.py                    # FastAPI app, routes, startup
+├── mock_data.py               # Fake plants & readings (replaced by Supabase later)
+├── requirements.txt           # fastapi, uvicorn, jinja2, python-dotenv
+├── Procfile                   # Start command for Railway
+├── railway.toml               # Railway deployment config
+├── .env                       # SUPABASE_URL, SUPABASE_KEY (git-ignored)
+├── templates/
+│   ├── base.html              # Layout: Tailwind CDN, HTMX CDN, dark mode
+│   ├── dashboard.html         # Main page: summary bar + plant card grid
+│   └── partials/
+│       └── plant_card.html    # Single plant card (HTMX-swappable)
+└── static/
+    └── favicon.ico
 ```
 
-### Key dashboard queries
+### Key dashboard queries (Python + Supabase SDK)
 
-```typescript
-// lib/queries.ts
-import { supabase } from './supabase-browser'
+```python
+# queries.py — to be added when Supabase is wired up
+from supabase import create_client
+import os
 
-// Get all plants with their latest reading
-export async function getPlantsWithLatestReading() {
-  const { data } = await supabase
-    .from('plants')
-    .select(`
-      *,
-      readings (
-        moisture, battery, raw_value, recorded_at
-      )
-    `)
-    .order('recorded_at', { referencedTable: 'readings', ascending: false })
-    .limit(1, { referencedTable: 'readings' })
+supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
-  return data
-}
+def get_plants_with_latest_reading():
+    """Get all plants with their most recent reading."""
+    result = supabase.table("plants").select(
+        "*, readings(moisture, battery, raw_value, recorded_at)"
+    ).order(
+        "recorded_at", desc=True, foreign_table="readings"
+    ).limit(1, foreign_table="readings").execute()
+    return result.data
 
-// Get 7-day history for a specific plant
-export async function getPlantHistory(sensorId: string, days: number = 7) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-
-  const { data } = await supabase
-    .from('readings')
-    .select('moisture, battery, recorded_at')
-    .eq('sensor_id', sensorId)
-    .gte('recorded_at', since)
-    .order('recorded_at', { ascending: true })
-
-  return data
-}
+def get_plant_history(sensor_id: str, days: int = 7):
+    """Get 7-day reading history for a specific plant."""
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    result = supabase.table("readings").select(
+        "moisture, battery, recorded_at"
+    ).eq("sensor_id", sensor_id).gte(
+        "recorded_at", since
+    ).order("recorded_at", desc=False).execute()
+    return result.data
 ```
 
 ### Watering prediction logic
 
-```typescript
-// lib/predictions.ts
+```python
+# predictions.py — to be added
+from datetime import datetime, timezone
 
-interface PredictionInput {
-  recentReadings: { moisture: number; recorded_at: string }[]
-  waterBelow: number
-  currentMoisture: number
-}
+def predict_days_until_watering(
+    recent_readings: list[dict],
+    water_below: float,
+    current_moisture: float,
+) -> float:
+    """Predict days until plant needs watering based on moisture decay rate."""
+    if current_moisture <= water_below:
+        return 0
+    if len(recent_readings) < 2:
+        return -1  # not enough data
 
-export function predictDaysUntilWatering(input: PredictionInput): number {
-  const { recentReadings, waterBelow, currentMoisture } = input
+    recent = recent_readings[-48:]  # ~24h of readings at 30-min intervals
+    first = recent[0]
+    last = recent[-1]
 
-  if (currentMoisture <= waterBelow) return 0
-  if (recentReadings.length < 2) return -1  // not enough data
+    t0 = datetime.fromisoformat(first["recorded_at"])
+    t1 = datetime.fromisoformat(last["recorded_at"])
+    hours_elapsed = (t1 - t0).total_seconds() / 3600
 
-  // Calculate average hourly moisture drop from last 48h of readings
-  const recent = recentReadings.slice(-48)  // assuming ~1 reading per 30 min
-  const first = recent[0]
-  const last = recent[recent.length - 1]
+    if hours_elapsed < 1:
+        return -1
 
-  const hoursElapsed =
-    (new Date(last.recorded_at).getTime() - new Date(first.recorded_at).getTime()) / 3600000
+    moisture_drop = first["moisture"] - last["moisture"]
+    drop_per_hour = moisture_drop / hours_elapsed
 
-  if (hoursElapsed < 1) return -1
+    if drop_per_hour <= 0:
+        return 99  # moisture is rising or stable
 
-  const moistureDrop = first.moisture - last.moisture
-  const dropPerHour = moistureDrop / hoursElapsed
-
-  if (dropPerHour <= 0) return 99  // moisture is rising or stable
-
-  const hoursRemaining = (currentMoisture - waterBelow) / dropPerHour
-  return Math.round((hoursRemaining / 24) * 10) / 10
-}
+    hours_remaining = (current_moisture - water_below) / drop_per_hour
+    return round(hours_remaining / 24, 1)
 ```
 
-### Deploy to Vercel
+### HTMX auto-refresh pattern
+
+Each plant card includes an HTMX attribute that polls its own endpoint every 30 seconds. The server returns a fresh HTML fragment and HTMX swaps it in — no full page reload, no JavaScript state management:
+
+```html
+<div hx-get="/api/plant/sensor-01" hx-trigger="every 30s" hx-swap="outerHTML">
+  <!-- plant card content rendered by Jinja2 -->
+</div>
+```
+
+### Deploy to Railway
 
 ```bash
-# 1. Create the project
-npx create-next-app@latest plant-monitor --typescript --tailwind --app
-cd plant-monitor
+# 1. Push to GitHub
+cd moist
+git remote add origin https://github.com/YOU/moist.git
+git push -u origin main
 
-# 2. Install dependencies
-npm install @supabase/supabase-js @supabase/ssr recharts
-
-# 3. Add environment variables to .env.local
-#    NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-#    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbG...
-
-# 4. Build and test locally
-npm run dev
-
-# 5. Deploy
-npx vercel
+# 2. Go to railway.app, sign in with GitHub
+# 3. New Project → Deploy from GitHub Repo → select "moist"
+# 4. Set Root Directory to "web" in service settings
+# 5. Settings → Networking → Generate Domain
+# 6. Add env vars SUPABASE_URL and SUPABASE_KEY (when ready)
 ```
 
-Add the same env vars in Vercel's project settings under **Settings → Environment Variables**.
+### Dashboard routes
 
-### Dashboard pages to build
-
-1. **`/login`** — email + password form, calls `supabase.auth.signInWithPassword()`
-2. **`/dashboard`** — grid of plant cards on the left, detail panel on the right
-3. **`/dashboard/settings`** (later) — add/remove plants, edit thresholds, manage sensors
-4. **`/api/health`** (optional) — endpoint the Pi can ping to verify cloud connectivity
-
-### Realtime updates (optional, nice-to-have)
-
-Supabase supports Postgres realtime — the dashboard can subscribe to new readings and update without polling:
-
-```typescript
-supabase
-  .channel('readings')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'readings' },
-    (payload) => {
-      // Update the relevant plant card in state
-    }
-  )
-  .subscribe()
-```
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/` | GET | Main dashboard — renders all plant cards |
+| `/api/plant/{id}` | GET | Single plant card partial (HTMX refresh) |
+| `/health` | GET | Healthcheck for Railway |
+| `/login` | GET/POST | Login form with Supabase Auth (future) |
+| `/settings` | GET/POST | Manage plants, thresholds, sensors (future) |
 
 ---
 
-## What to Do Right Now (No Hardware Needed)
+## What to Do Next (No Hardware Needed)
 
 | Priority | Task | Time Est. |
 |----------|------|-----------|
-| 1 | Create Supabase project, run the SQL schema above | 15 min |
-| 2 | Install Mosquitto locally, run `fake_sensors.py` and `ingest.py` | 30 min |
-| 3 | Connect `ingest.py` to Supabase so fake readings flow into the DB | 30 min |
-| 4 | Scaffold Next.js project, wire up Supabase Auth for login | 1–2 hrs |
-| 5 | Build dashboard UI (plant cards, sparklines, detail panel) | 2–3 hrs |
-| 6 | Add prediction logic and watering countdown | 1 hr |
-| 7 | Deploy to Vercel | 15 min |
-| 8 | **When hardware arrives:** flash ESP32s, calibrate sensors, swap fake publisher for real nodes | 1–2 hrs |
+| ~~1~~ | ~~Build dashboard UI with mock data~~ | ~~done~~ |
+| 2 | Create Supabase project, run the SQL schema above | 15 min |
+| 3 | Wire dashboard to Supabase (replace mock_data.py with real queries) | 1–2 hrs |
+| 4 | Add Supabase Auth for login-protected dashboard | 1–2 hrs |
+| 5 | Install Mosquitto locally, run `fake_sensors.py` and `ingest.py` | 30 min |
+| 6 | Connect `ingest.py` to Supabase so fake readings flow into the DB | 30 min |
+| 7 | Add watering prediction logic and countdown display | 1 hr |
+| 8 | Deploy to Railway | 15 min |
+| 9 | **When hardware arrives:** flash ESP32s, calibrate sensors, swap fake publisher for real nodes | 1–2 hrs |
