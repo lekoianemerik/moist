@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold tracking-tight">
+      &#x1f331; moist
+    </h1>
+    <p class="mt-1 text-sm text-stone-500 dark:text-stone-400">
+      Soil humidity monitor &mdash; {{ plants | length }} plants tracked
+    </p>
+  </div>
+
+  <!-- Summary bar -->
+  <div class="mb-6 flex flex-wrap gap-3">
+    <div class="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+      <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+      {{ healthy_count }} healthy
+    </div>
+    {% if needs_attention > 0 %}
+    <div class="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+      <span class="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+      {{ needs_attention }} needs attention
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Plant cards grid -->
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+    {% for plant in plants %}
+      {% include "partials/plant_card.html" %}
+    {% endfor %}
+  </div>
+
+  <!-- Footer -->
+  <p class="mt-8 text-center text-xs text-stone-400 dark:text-stone-600">
+    Showing mock data &mdash; connect Supabase to see real sensor readings
+  </p>
+
+</div>
+{% endblock %}

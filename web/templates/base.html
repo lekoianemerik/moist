@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>moist &mdash; Soil Humidity Monitor</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'media',
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-full bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100 font-sans antialiased">
+  {% block content %}{% endblock %}
+</body>
+</html>
