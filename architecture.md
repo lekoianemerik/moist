@@ -12,10 +12,10 @@ Technical reference for the moist system. For the aspirational vision (hardware,
                               │                                          │
     ┌──────────────┐  HTTPS   │  ┌──────────┐  ┌───────────┐            │
     │ Raspberry Pi │─────────▶│  │ Postgres │  │   Auth    │            │
-    │ ingest.py    │  insert  │  │ 3 tables │  │ JWKS keys │            │
-    └──────────────┘          │  │ 2 views  │  └─────┬─────┘            │
-                              │  └────┬─────┘        │                  │
-                              │       │ REST API     │ .well-known/jwks │
+    │  fake cron   │  insert  │  │ 3 tables │  │ JWKS keys │            │
+    │  (or MQTT    │          │  │ 2 views  │  └─────┬─────┘            │
+    │   ingest)    │          │  └────┬─────┘        │                  │
+    └──────────────┘          │       │ REST API     │ .well-known/jwks │
                               └───────┼──────────────┼──────────────────┘
                                       │              │
                                       ▼              ▼
@@ -184,21 +184,33 @@ The `.env` file is used for local development only and is git-ignored. Railway i
 
 ## Request flow (dashboard)
 
-When a user loads the dashboard, `db.py` issues 3 Supabase queries:
+When a user loads the dashboard, `db.py` issues 2 + N Supabase queries (where N = number of plants):
 
 1. `SELECT * FROM current_plants ORDER BY plant_id` -- all plant configs
 2. `SELECT * FROM current_sensors ORDER BY sensor_id` -- all sensor configs (to map sensor → plant)
-3. `SELECT ... FROM readings WHERE recorded_at >= (now - 7 days) ORDER BY recorded_at LIMIT 5000` -- all readings from the past week
+3. For **each** sensor: `SELECT ... FROM readings WHERE sensor_id = ? AND recorded_at >= (now - 7 days) ORDER BY recorded_at` -- 7-day history for that sensor
+
+Readings are fetched per-sensor rather than in one bulk query to avoid hitting the Supabase PostgREST default row limit (1 000 rows). A single query across all sensors can silently truncate results when the total exceeds the cap.
 
 Results are assembled into `Plant` dataclass objects in Python. Each plant gets its latest reading (last item in history) and full 7-day history (for the sparkline SVG). The Jinja2 templates render server-side HTML.
 
-For HTMX card refreshes (every 30s per card), `get_plant_card(plant_id)` runs the same 3 queries scoped to a single plant/sensor.
+For HTMX card refreshes (every 30s per card), `get_plant_card(plant_id)` runs 3 queries scoped to a single plant/sensor.
+
+All dashboard and HTMX partial responses include `Cache-Control: no-store` headers to prevent browsers and proxies from serving stale HTML.
 
 ---
 
 ## File reference
 
 ```
+fake_cron/                       # Fake sensor cron job (runs on Raspberry Pi)
+├── send_reading.py              # Generates fake readings, inserts into Supabase
+│                                #   Persists state to state.json between runs
+│                                #   Simulates drying, battery drain, watering events
+├── requirements.txt             # supabase, python-dotenv
+├── .env.example                 # SUPABASE_URL + SUPABASE_SECRET_KEY
+└── README.md                    # Setup + crontab instructions
+
 web/
 ├── main.py              # FastAPI routes + auth middleware
 │                        #   _get_user() -- verify JWT from cookie

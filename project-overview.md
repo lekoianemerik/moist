@@ -1,6 +1,6 @@
 # 🌱 Soil Humidity Monitor — Project Overview
 
-**Status:** Web dashboard wired to Supabase, ready for Railway deploy. Hardware on order.
+**Status:** Web dashboard wired to Supabase, ready for Railway deploy. Fake sensor cron job ready for Raspberry Pi. Hardware on order.
 **Location:** Ireland
 **Last updated:** February 2026
 
@@ -142,12 +142,16 @@ home/plants/2/moisture  →  {"moisture": 38.1, "battery": 63, "raw": 2104}
 ...
 ```
 
-### Stage 3 — Raspberry Pi → Supabase (can test NOW)
+### Stage 3 — Raspberry Pi → Supabase (DONE — fake cron)
 
-A Python service on the Pi subscribes to `home/plants/+/moisture`, processes each message, and inserts it into Supabase via its REST API. Uses the secret key (bypasses RLS) for server-side inserts.
+**Before hardware arrives**, a simpler approach skips MQTT entirely: a cron job on the Raspberry Pi runs `fake_cron/send_reading.py` every 30 minutes, generating fake readings and inserting them directly into Supabase. This validates the full cloud pipeline (Pi → Supabase → dashboard) without needing Mosquitto or real sensors.
+
+See `fake_cron/README.md` for setup and crontab instructions.
+
+**When hardware arrives**, this will be replaced by the real MQTT ingest pipeline:
 
 ```python
-# ingest.py — runs on the Raspberry Pi
+# ingest.py — runs on the Raspberry Pi (future, replaces fake_cron)
 import json, os
 import paho.mqtt.client as mqtt
 from supabase import create_client
@@ -399,8 +403,8 @@ The `.env` file is git-ignored. Railway injects env vars from its dashboard at r
 | ~~2~~ | ~~Create Supabase project, run the SQL schema~~ | Done (`supabase/schema.sql`) |
 | ~~3~~ | ~~Wire dashboard to Supabase (replace mock data with real queries)~~ | Done (`web/db.py`) |
 | ~~4~~ | ~~Add Supabase Auth for login-protected dashboard~~ | Done (email/password, JWKS) |
-| 5 | Deploy to Railway | Ready — push to GitHub and configure |
-| 6 | Install Mosquitto locally, run `fake_sensors.py` and `ingest.py` | Not started |
-| 7 | Connect `ingest.py` to Supabase so fake readings flow into the DB | Not started |
+| ~~5~~ | ~~Fake sensor cron job for Pi → Supabase testing~~ | Done (`fake_cron/`) |
+| 6 | Deploy to Railway | Ready — push to GitHub and configure |
+| 7 | Set up fake cron on Raspberry Pi | Ready — see `fake_cron/README.md` |
 | 8 | Add watering prediction logic and countdown display | Not started |
-| 9 | **When hardware arrives:** flash ESP32s, calibrate sensors, go live | Waiting for delivery |
+| 9 | **When hardware arrives:** flash ESP32s, calibrate sensors, replace fake cron with real MQTT pipeline | Waiting for delivery |

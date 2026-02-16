@@ -14,8 +14,8 @@ Soil humidity monitoring system for houseplants. Tracks moisture levels, battery
 | Supabase database (schema + seed data) | Done -- `supabase/schema.sql` ready to run |
 | Supabase Auth (email/password login) | Done -- cookie-based sessions, JWKS verification |
 | Railway deployment | Ready -- `railway.toml` configured, needs env vars |
-| MQTT pipeline (fake sensors) | Not started |
-| Raspberry Pi ingest service | Not started |
+| Fake sensor cron job (Raspberry Pi) | Done -- `fake_cron/` inserts fake readings every 30 min |
+| MQTT pipeline (real sensors) | Not started |
 | ESP32 firmware | Waiting for hardware |
 
 ## Tech stack
@@ -39,6 +39,11 @@ moist/
 ├── architecture.md            # Data model, auth flow, deployment architecture
 ├── supabase/
 │   └── schema.sql             # DDL + seed data + dummy readings (run in SQL Editor)
+├── fake_cron/                 # Fake sensor cron job (runs on Raspberry Pi)
+│   ├── send_reading.py        # Generates + inserts fake readings into Supabase
+│   ├── requirements.txt       # Python dependencies (supabase, python-dotenv)
+│   ├── .env.example           # Template for Supabase credentials
+│   └── README.md              # Setup + crontab instructions
 └── web/                       # FastAPI web dashboard
     ├── main.py                # Routes + auth middleware (6 endpoints)
     ├── db.py                  # Supabase clients, data models, queries
@@ -98,8 +103,8 @@ Railway auto-deploys on every push to `main`. The `.env` file is git-ignored; Ra
 ## What's next
 
 1. Deploy to Railway
-2. Set up MQTT pipeline with fake sensors for end-to-end testing
+2. Set up fake cron job on Raspberry Pi (see `fake_cron/README.md`)
 3. Add watering prediction logic and countdown display
-4. When hardware arrives: flash ESP32s, calibrate sensors, go live
+4. When hardware arrives: flash ESP32s, calibrate sensors, replace fake cron with real MQTT pipeline
 
 See [project-overview.md](project-overview.md) for the full aspirational design and [architecture.md](architecture.md) for technical details.

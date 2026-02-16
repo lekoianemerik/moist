@@ -122,6 +122,9 @@ async def health():
 # ---------------------------------------------------------------------------
 
 
+NO_CACHE_HEADERS = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard -- renders all plant cards."""
@@ -141,6 +144,7 @@ async def dashboard(request: Request):
             "needs_attention": needs_attention,
             "generate_sparkline_svg": generate_sparkline_svg,
         },
+        headers=NO_CACHE_HEADERS,
     )
 
 
@@ -161,4 +165,5 @@ async def plant_card_partial(request: Request, plant_id: int):
             "plant": plant,
             "generate_sparkline_svg": generate_sparkline_svg,
         },
+        headers=NO_CACHE_HEADERS,
     )

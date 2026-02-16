@@ -258,7 +258,11 @@ def _row_to_reading(row: dict) -> Reading:
 def get_all_plants() -> list[Plant]:
     """All plants with current sensor, latest reading, and 7-day history.
 
-    Issues 3 queries: current_plants, current_sensors, readings (7 days).
+    Issues 2 + N queries: current_plants, current_sensors, then one readings
+    query per sensor.  Readings are fetched per-sensor to avoid hitting the
+    Supabase PostgREST default row limit (1 000 rows).  A single bulk query
+    across all sensors can silently truncate results when the total exceeds
+    that cap, causing the dashboard to show stale data on page load.
     """
     client = _get_data_client()
 
@@ -274,25 +278,21 @@ def get_all_plants() -> list[Plant]:
     }
 
     since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    readings_res = (
-        client.table("readings")
-        .select("sensor_id, moisture_pct, battery, moisture_raw, recorded_at")
-        .gte("recorded_at", since)
-        .order("recorded_at")
-        .limit(5000)
-        .execute()
-    )
-
-    readings_by_sensor: dict[int, list[Reading]] = {}
-    for row in readings_res.data:
-        sid = row["sensor_id"]
-        readings_by_sensor.setdefault(sid, []).append(_row_to_reading(row))
 
     plants: list[Plant] = []
     for p in plants_res.data:
         sensor = sensor_by_plant.get(p["plant_id"])
         sensor_id = sensor["sensor_id"] if sensor else 0
-        history = readings_by_sensor.get(sensor_id, [])
+
+        readings_res = (
+            client.table("readings")
+            .select("sensor_id, moisture_pct, battery, moisture_raw, recorded_at")
+            .eq("sensor_id", sensor_id)
+            .gte("recorded_at", since)
+            .order("recorded_at")
+            .execute()
+        )
+        history = [_row_to_reading(r) for r in readings_res.data]
 
         plants.append(
             Plant(
