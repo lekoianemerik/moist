@@ -9,7 +9,11 @@ venv/
 
 # env files (contain secrets)
 .env
-.env.*
+!.env.example
+
+# fake_cron runtime files
+fake_cron/state.json
+fake_cron/cron.log
 
 # misc
 .DS_Store
