@@ -23,13 +23,19 @@
   <div class="mb-3">
     <div class="mb-1 flex items-baseline justify-between">
       <span class="text-sm text-stone-500 dark:text-stone-400">Moisture</span>
+      {% if plant.latest %}
       <span class="text-xl font-bold tabular-nums">{{ "%.1f" | format(plant.latest.moisture_pct) }}%</span>
+      {% else %}
+      <span class="text-sm text-stone-400 dark:text-stone-500">&mdash;</span>
+      {% endif %}
     </div>
     <div class="h-2 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+      {% if plant.latest %}
       <div
         class="h-full rounded-full transition-all {{ plant.bar_color }}"
         style="width: {{ [plant.latest.moisture_pct, 100] | min }}%"
       ></div>
+      {% endif %}
     </div>
     <div class="mt-0.5 flex justify-between text-[10px] text-stone-400 dark:text-stone-600">
       <span>0%</span>
@@ -46,7 +52,11 @@
 
   <!-- Footer: battery + last updated -->
   <div class="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400">
+    {% if plant.latest %}
     <span>{{ plant.battery_icon }} {{ plant.latest.battery }}%</span>
+    {% else %}
+    <span>{{ plant.battery_icon }} No data</span>
+    {% endif %}
     <span>Updated {{ plant.time_ago }}</span>
   </div>
 </div>
