@@ -11,10 +11,11 @@ Soil humidity monitoring system for houseplants. Tracks moisture levels, battery
 | Component | Status |
 |-----------|--------|
 | Web dashboard (FastAPI + HTMX) | Done -- reads from Supabase, login-protected |
+| Plant/sensor management pages | Done -- add, edit, remove plants and sensors from the UI |
 | Supabase database (schema + seed data) | Done -- `supabase/schema.sql` ready to run |
 | Supabase Auth (email/password login) | Done -- cookie-based sessions, JWKS verification |
 | Railway deployment | Ready -- `railway.toml` configured, needs env vars |
-| Fake sensor cron job (Raspberry Pi) | Done -- `fake_cron/` inserts fake readings every 30 min |
+| Fake sensor cron job (Raspberry Pi) | Done -- `fake_cron/` discovers sensors dynamically from Supabase |
 | MQTT pipeline (real sensors) | Not started |
 | ESP32 firmware | Waiting for hardware |
 
@@ -40,13 +41,13 @@ moist/
 ├── supabase/
 │   └── schema.sql             # DDL + seed data + dummy readings (run in SQL Editor)
 ├── fake_cron/                 # Fake sensor cron job (runs on Raspberry Pi)
-│   ├── send_reading.py        # Generates + inserts fake readings into Supabase
+│   ├── send_reading.py        # Discovers active sensors from Supabase, inserts fake readings
 │   ├── requirements.txt       # Python dependencies (supabase, python-dotenv)
 │   ├── .env.example           # Template for Supabase credentials
 │   └── README.md              # Setup + crontab instructions
 └── web/                       # FastAPI web dashboard
-    ├── main.py                # Routes + auth middleware (6 endpoints)
-    ├── db.py                  # Supabase clients, data models, queries
+    ├── main.py                # Routes + auth middleware (14 endpoints)
+    ├── db.py                  # Supabase clients, data models, queries, CRUD
     ├── requirements.txt       # Python dependencies
     ├── railway.toml           # Railway deployment config
     ├── runtime.txt            # Python 3.12
@@ -56,6 +57,8 @@ moist/
     │   ├── base.html          # Layout: Tailwind CDN, HTMX CDN, dark mode
     │   ├── login.html         # Login page (pre-auth screen)
     │   ├── dashboard.html     # Main page: summary bar + plant card grid
+    │   ├── manage_plants.html # Plant management: add, edit, remove plants
+    │   ├── manage_sensors.html # Sensor management: add, edit, remove, link to plants
     │   └── partials/
     │       └── plant_card.html  # Individual plant card (HTMX-swappable)
     └── static/

@@ -359,3 +359,211 @@ def get_plant_card(plant_id: int) -> Plant | None:
         latest=history[-1] if history else None,
         history=history,
     )
+
+
+# ---------------------------------------------------------------------------
+# Management data models
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PlantConfig:
+    plant_id: int
+    plant_name: str
+    plant_position: str
+    ideal_min: int
+    ideal_max: int
+    water_below: int
+
+
+@dataclass
+class SensorConfig:
+    sensor_id: int
+    plant_id: int
+    calibration_dry: int
+    calibration_wet: int
+
+
+# ---------------------------------------------------------------------------
+# Plant CRUD
+# ---------------------------------------------------------------------------
+
+
+def get_all_plant_configs() -> list[PlantConfig]:
+    """All current (active) plant configurations."""
+    client = _get_data_client()
+    res = client.table("current_plants").select("*").order("plant_id").execute()
+    return [
+        PlantConfig(
+            plant_id=r["plant_id"],
+            plant_name=r["plant_name"],
+            plant_position=r.get("plant_position") or "",
+            ideal_min=r["ideal_min"],
+            ideal_max=r["ideal_max"],
+            water_below=r["water_below"],
+        )
+        for r in res.data
+    ]
+
+
+def add_plant(
+    name: str,
+    position: str,
+    ideal_min: int,
+    ideal_max: int,
+    water_below: int,
+) -> None:
+    """Add a new plant with an auto-generated plant_id."""
+    client = _get_data_client()
+    res = client.table("current_plants").select("plant_id").order("plant_id", desc=True).limit(1).execute()
+    next_id = (res.data[0]["plant_id"] + 1) if res.data else 1
+    client.table("plants").insert({
+        "plant_id": next_id,
+        "plant_name": name,
+        "plant_position": position,
+        "ideal_min": ideal_min,
+        "ideal_max": ideal_max,
+        "water_below": water_below,
+        "is_active": True,
+    }).execute()
+
+
+def update_plant(
+    plant_id: int,
+    name: str,
+    position: str,
+    ideal_min: int,
+    ideal_max: int,
+    water_below: int,
+) -> None:
+    """Update a plant's metadata by appending a new config row."""
+    client = _get_data_client()
+    client.table("plants").insert({
+        "plant_id": plant_id,
+        "plant_name": name,
+        "plant_position": position,
+        "ideal_min": ideal_min,
+        "ideal_max": ideal_max,
+        "water_below": water_below,
+        "is_active": True,
+    }).execute()
+
+
+def delete_plant(plant_id: int) -> None:
+    """Deactivate a plant by appending a row with is_active=false.
+
+    Also deactivates any sensors linked to this plant.
+    """
+    client = _get_data_client()
+
+    # Deactivate the plant
+    res = (
+        client.table("current_plants")
+        .select("*")
+        .eq("plant_id", plant_id)
+        .execute()
+    )
+    if not res.data:
+        return
+    p = res.data[0]
+    client.table("plants").insert({
+        "plant_id": plant_id,
+        "plant_name": p["plant_name"],
+        "plant_position": p.get("plant_position") or "",
+        "ideal_min": p["ideal_min"],
+        "ideal_max": p["ideal_max"],
+        "water_below": p["water_below"],
+        "is_active": False,
+    }).execute()
+
+    # Deactivate linked sensors
+    sensors_res = (
+        client.table("current_sensors")
+        .select("*")
+        .eq("plant_id", plant_id)
+        .execute()
+    )
+    for s in sensors_res.data:
+        client.table("sensors").insert({
+            "sensor_id": s["sensor_id"],
+            "plant_id": s["plant_id"],
+            "calibration_dry": s["calibration_dry"],
+            "calibration_wet": s["calibration_wet"],
+            "is_active": False,
+        }).execute()
+
+
+# ---------------------------------------------------------------------------
+# Sensor CRUD
+# ---------------------------------------------------------------------------
+
+
+def get_all_sensor_configs() -> list[SensorConfig]:
+    """All current (active) sensor configurations."""
+    client = _get_data_client()
+    res = client.table("current_sensors").select("*").order("sensor_id").execute()
+    return [
+        SensorConfig(
+            sensor_id=r["sensor_id"],
+            plant_id=r["plant_id"],
+            calibration_dry=r["calibration_dry"],
+            calibration_wet=r["calibration_wet"],
+        )
+        for r in res.data
+    ]
+
+
+def add_sensor(
+    plant_id: int,
+    calibration_dry: int,
+    calibration_wet: int,
+) -> None:
+    """Add a new sensor with an auto-generated sensor_id."""
+    client = _get_data_client()
+    res = client.table("current_sensors").select("sensor_id").order("sensor_id", desc=True).limit(1).execute()
+    next_id = (res.data[0]["sensor_id"] + 1) if res.data else 1
+    client.table("sensors").insert({
+        "sensor_id": next_id,
+        "plant_id": plant_id,
+        "calibration_dry": calibration_dry,
+        "calibration_wet": calibration_wet,
+        "is_active": True,
+    }).execute()
+
+
+def update_sensor(
+    sensor_id: int,
+    plant_id: int,
+    calibration_dry: int,
+    calibration_wet: int,
+) -> None:
+    """Update a sensor's config by appending a new row."""
+    client = _get_data_client()
+    client.table("sensors").insert({
+        "sensor_id": sensor_id,
+        "plant_id": plant_id,
+        "calibration_dry": calibration_dry,
+        "calibration_wet": calibration_wet,
+        "is_active": True,
+    }).execute()
+
+
+def delete_sensor(sensor_id: int) -> None:
+    """Deactivate a sensor by appending a row with is_active=false."""
+    client = _get_data_client()
+    res = (
+        client.table("current_sensors")
+        .select("*")
+        .eq("sensor_id", sensor_id)
+        .execute()
+    )
+    if not res.data:
+        return
+    s = res.data[0]
+    client.table("sensors").insert({
+        "sensor_id": sensor_id,
+        "plant_id": s["plant_id"],
+        "calibration_dry": s["calibration_dry"],
+        "calibration_wet": s["calibration_wet"],
+        "is_active": False,
+    }).execute()

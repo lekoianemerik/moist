@@ -1,6 +1,6 @@
 # fake_cron — Fake sensor readings for moist
 
-Runs on a Raspberry Pi (or any machine) via cron. Every 30 minutes it inserts one fake reading per sensor into Supabase, simulating gradual soil drying, battery drain, and occasional watering events.
+Runs on a Raspberry Pi (or any machine) via cron. Every 30 minutes it discovers active sensors from Supabase and inserts one fake reading per sensor, simulating gradual soil drying, battery drain, and occasional watering events. Sensors added or removed via the web dashboard are automatically picked up on the next run.
 
 ## Setup on the Raspberry Pi
 
@@ -67,11 +67,12 @@ Or check Supabase Table Editor — you should see new rows in the `readings` tab
 
 ## How it works
 
+- **Dynamic sensor discovery:** On each run, queries the `current_sensors` view from Supabase to get active sensors. New sensors are automatically initialized; removed sensors are pruned from state.
 - **State file (`state.json`):** Persists current moisture and battery levels between cron runs so values drift realistically over time. Auto-created on first run. Delete it to reset to defaults.
 - **Drying simulation:** Each tick, moisture drops 0.2–0.8 % with ±0.3 % noise.
 - **Watering events:** ~3 % chance per tick (roughly once every 17 hours), moisture jumps up by 30–45 %.
 - **Battery drain:** ~0.01 %/tick (≈ 0.5 %/day), bottoms out at 5 %.
-- **Raw ADC:** Computed from moisture % using each sensor's calibration values (matching `supabase/schema.sql`).
+- **Raw ADC:** Computed from moisture % using each sensor's calibration values fetched from Supabase.
 
 ## Files
 

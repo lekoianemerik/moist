@@ -29,6 +29,8 @@ Technical reference for the moist system. For the aspirational vision (hardware,
                               │     ├── POST /logout (public)            │
                               │     ├── GET /        (auth required)     │
                               │     ├── GET /api/plant/{id} (auth, HTMX) │
+                              │     ├── GET /manage/plants  (auth, CRUD) │
+                              │     ├── GET /manage/sensors (auth, CRUD) │
                               │     └── GET /health  (public)            │
                               └──────────────────────────────────────────┘
                                       ▲
@@ -47,9 +49,9 @@ Three tables with an append-only temporal pattern for plants and sensors, and pu
 
 ### Why append-only?
 
-Records are never updated or deleted. To change a plant's config or recalibrate a sensor, insert a new row with a fresh timestamp. The current state is always the most recent row per ID. This preserves full history for debugging and auditing.
+Records are never updated or deleted. To change a plant's config or recalibrate a sensor, insert a new row with a fresh timestamp. To remove a plant or sensor, insert a row with `is_active = false`. The current state is always the most recent active row per ID. This preserves full history for debugging and auditing.
 
-Two Postgres views (`current_plants`, `current_sensors`) encapsulate the `DISTINCT ON (...) ORDER BY created_at DESC` logic so application queries stay simple.
+Two Postgres views (`current_plants`, `current_sensors`) encapsulate the `DISTINCT ON (...) ORDER BY created_at DESC` logic with a `WHERE is_active = true` filter, so application queries stay simple.
 
 ### Tables
 
@@ -62,6 +64,7 @@ plants (append-only config)
 ├── ideal_min       integer             -- ideal moisture range lower bound
 ├── ideal_max       integer             -- ideal moisture range upper bound
 ├── water_below     integer             -- flag as needing water below this %
+├── is_active       boolean             -- false = soft-deleted (views exclude these)
 └── created_at      timestamptz         -- version timestamp
 
 sensors (append-only config)
@@ -70,6 +73,7 @@ sensors (append-only config)
 ├── plant_id        integer             -- which plant this sensor is assigned to
 ├── calibration_dry integer             -- raw ADC value at 0% (air, ~3200)
 ├── calibration_wet integer             -- raw ADC value at 100% (water, ~1400)
+├── is_active       boolean             -- false = soft-deleted (views exclude these)
 └── created_at      timestamptz         -- version timestamp
 
 readings (time-series)
@@ -83,8 +87,8 @@ readings (time-series)
 
 ### Views
 
-- `current_plants` -- latest row per `plant_id`
-- `current_sensors` -- latest row per `sensor_id`
+- `current_plants` -- latest active row per `plant_id` (filters `is_active = true`)
+- `current_sensors` -- latest active row per `sensor_id` (filters `is_active = true`)
 
 ### Relationships
 
@@ -204,9 +208,10 @@ All dashboard and HTMX partial responses include `Cache-Control: no-store` heade
 
 ```
 fake_cron/                       # Fake sensor cron job (runs on Raspberry Pi)
-├── send_reading.py              # Generates fake readings, inserts into Supabase
+├── send_reading.py              # Discovers active sensors from Supabase, inserts fake readings
 │                                #   Persists state to state.json between runs
 │                                #   Simulates drying, battery drain, watering events
+│                                #   Automatically picks up new sensors, skips removed ones
 ├── requirements.txt             # supabase, python-dotenv
 ├── .env.example                 # SUPABASE_URL + SUPABASE_SECRET_KEY
 └── README.md                    # Setup + crontab instructions
@@ -215,16 +220,18 @@ web/
 ├── main.py              # FastAPI routes + auth middleware
 │                        #   _get_user() -- verify JWT from cookie
 │                        #   _auth_failed_response() -- HTMX-aware redirect
-│                        #   6 route handlers
+│                        #   14 route handlers (6 original + 8 management)
 │
 ├── db.py                # Supabase clients + data layer
 │                        #   _get_auth_client() -- publishable key, for auth
 │                        #   _get_data_client() -- secret key, for queries
 │                        #   _get_jwks_client() -- JWKS endpoint, for JWT verification
 │                        #   Plant / Reading dataclasses with computed properties
+│                        #   PlantConfig / SensorConfig dataclasses for management
 │                        #   generate_sparkline_svg() -- server-rendered SVG
 │                        #   authenticate() / verify_token()
 │                        #   get_all_plants() / get_plant_card()
+│                        #   CRUD: add/update/delete plant and sensor
 │
 ├── requirements.txt     # fastapi, uvicorn, jinja2, python-dotenv,
 │                        # python-multipart, supabase, PyJWT[crypto]
@@ -237,6 +244,8 @@ web/
 │   ├── base.html        # <html> shell: Tailwind CDN, HTMX CDN, 401 handler
 │   ├── login.html       # centered login card (extends base)
 │   ├── dashboard.html   # header + summary bar + card grid (extends base)
+│   ├── manage_plants.html  # plant CRUD: add, inline edit, remove
+│   ├── manage_sensors.html # sensor CRUD: add, edit, link to plant, remove
 │   └── partials/
 │       └── plant_card.html  # single card: moisture bar, sparkline, battery
 │

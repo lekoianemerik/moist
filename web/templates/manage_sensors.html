@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+
+  <!-- Header -->
+  <div class="mb-8 flex items-start justify-between">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">
+        Manage Sensors
+      </h1>
+      <p class="mt-1 text-sm text-stone-500 dark:text-stone-400">
+        Add, edit, or remove sensors &mdash; {{ sensors | length }} active
+      </p>
+    </div>
+    <a href="/"
+      class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600
+             transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400
+             dark:hover:bg-stone-800">
+      &larr; Dashboard
+    </a>
+  </div>
+
+  <!-- Add sensor form -->
+  <div class="mb-8 rounded-xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+    <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+      Add new sensor
+    </h2>
+    <form method="post" action="/manage/sensors/add" class="flex flex-wrap items-end gap-3">
+      <div class="flex-1 min-w-[160px]">
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Linked plant</label>
+        <select name="plant_id" required
+          class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+          {% for plant in plants %}
+          <option value="{{ plant.plant_id }}">
+            #{{ plant.plant_id }} &mdash; {{ plant.plant_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="w-32">
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. dry (ADC)</label>
+        <input type="number" name="calibration_dry" value="3200" min="0" max="4095"
+          class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+      </div>
+      <div class="w-32">
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. wet (ADC)</label>
+        <input type="number" name="calibration_wet" value="1400" min="0" max="4095"
+          class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+      </div>
+      <button type="submit"
+        class="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white
+               transition-colors hover:bg-emerald-700">
+        Add
+      </button>
+    </form>
+  </div>
+
+  <!-- Sensor list -->
+  {% if sensors %}
+  <div class="space-y-3">
+    {% for sensor in sensors %}
+    <form method="post" action="/manage/sensors/{{ sensor.sensor_id }}/edit"
+      class="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="w-12 flex-none">
+          <label class="mb-1 block text-xs font-medium text-stone-400 dark:text-stone-500">ID</label>
+          <span class="block py-1.5 text-sm font-mono text-stone-500 dark:text-stone-400">
+            #{{ sensor.sensor_id }}
+          </span>
+        </div>
+        <div class="flex-1 min-w-[160px]">
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Linked plant</label>
+          <select name="plant_id" required
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                   dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                   focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+            {% for plant in plants %}
+            <option value="{{ plant.plant_id }}"
+              {% if plant.plant_id == sensor.plant_id %}selected{% endif %}>
+              #{{ plant.plant_id }} &mdash; {{ plant.plant_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="w-32">
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. dry (ADC)</label>
+          <input type="number" name="calibration_dry" value="{{ sensor.calibration_dry }}" min="0" max="4095"
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                   dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                   focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+        </div>
+        <div class="w-32">
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. wet (ADC)</label>
+          <input type="number" name="calibration_wet" value="{{ sensor.calibration_wet }}" min="0" max="4095"
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                   dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                   focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit"
+            class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600
+                   transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400
+                   dark:hover:bg-stone-800">
+            Save
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Delete button (separate form to avoid nesting) -->
+    <form method="post" action="/manage/sensors/{{ sensor.sensor_id }}/delete" class="-mt-1 ml-4">
+      <button type="submit"
+        onclick="return confirm('Remove sensor #{{ sensor.sensor_id }}? It will be deactivated.')"
+        class="text-xs text-red-500 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+        Remove sensor #{{ sensor.sensor_id }}
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-center text-sm text-stone-500 dark:text-stone-400">
+    No sensors yet. Add one above.
+  </p>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -14,6 +14,7 @@ CREATE TABLE plants (
     ideal_min     INTEGER NOT NULL DEFAULT 40,
     ideal_max     INTEGER NOT NULL DEFAULT 60,
     water_below   INTEGER NOT NULL DEFAULT 30,
+    is_active     BOOLEAN NOT NULL DEFAULT true,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -24,6 +25,7 @@ CREATE TABLE sensors (
     plant_id        INTEGER NOT NULL,
     calibration_dry INTEGER NOT NULL,   -- raw ADC reading at 0% moisture (dry / air)
     calibration_wet INTEGER NOT NULL,   -- raw ADC reading at 100% moisture (water)
+    is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -48,11 +50,13 @@ CREATE INDEX idx_readings_sensor_time ON readings (sensor_id, recorded_at DESC);
 CREATE VIEW current_plants AS
 SELECT DISTINCT ON (plant_id) *
 FROM plants
+WHERE is_active = true
 ORDER BY plant_id, created_at DESC;
 
 CREATE VIEW current_sensors AS
 SELECT DISTINCT ON (sensor_id) *
 FROM sensors
+WHERE is_active = true
 ORDER BY sensor_id, created_at DESC;
 
 -- 4. Seed data -----------------------------------------------

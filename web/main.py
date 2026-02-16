@@ -21,6 +21,14 @@ from db import (
     get_all_plants,
     get_plant_card,
     generate_sparkline_svg,
+    get_all_plant_configs,
+    get_all_sensor_configs,
+    add_plant,
+    update_plant,
+    delete_plant,
+    add_sensor,
+    update_sensor,
+    delete_sensor,
 )
 
 app = FastAPI(title="moist")
@@ -167,3 +175,128 @@ async def plant_card_partial(request: Request, plant_id: int):
         },
         headers=NO_CACHE_HEADERS,
     )
+
+
+# ---------------------------------------------------------------------------
+# Plant management routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/manage/plants", response_class=HTMLResponse)
+async def manage_plants_page(request: Request):
+    """Render the plant management page."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    plants = get_all_plant_configs()
+    return templates.TemplateResponse(
+        "manage_plants.html",
+        {"request": request, "plants": plants},
+        headers=NO_CACHE_HEADERS,
+    )
+
+
+@app.post("/manage/plants/add")
+async def manage_plants_add(
+    request: Request,
+    plant_name: str = Form(...),
+    plant_position: str = Form(""),
+    ideal_min: int = Form(40),
+    ideal_max: int = Form(60),
+    water_below: int = Form(30),
+):
+    """Add a new plant and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    add_plant(plant_name, plant_position, ideal_min, ideal_max, water_below)
+    return RedirectResponse("/manage/plants", status_code=303)
+
+
+@app.post("/manage/plants/{plant_id}/edit")
+async def manage_plants_edit(
+    request: Request,
+    plant_id: int,
+    plant_name: str = Form(...),
+    plant_position: str = Form(""),
+    ideal_min: int = Form(40),
+    ideal_max: int = Form(60),
+    water_below: int = Form(30),
+):
+    """Update a plant's metadata and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    update_plant(plant_id, plant_name, plant_position, ideal_min, ideal_max, water_below)
+    return RedirectResponse("/manage/plants", status_code=303)
+
+
+@app.post("/manage/plants/{plant_id}/delete")
+async def manage_plants_delete(request: Request, plant_id: int):
+    """Deactivate a plant and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    delete_plant(plant_id)
+    return RedirectResponse("/manage/plants", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Sensor management routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/manage/sensors", response_class=HTMLResponse)
+async def manage_sensors_page(request: Request):
+    """Render the sensor management page."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    sensors = get_all_sensor_configs()
+    plants = get_all_plant_configs()
+    return templates.TemplateResponse(
+        "manage_sensors.html",
+        {"request": request, "sensors": sensors, "plants": plants},
+        headers=NO_CACHE_HEADERS,
+    )
+
+
+@app.post("/manage/sensors/add")
+async def manage_sensors_add(
+    request: Request,
+    plant_id: int = Form(...),
+    calibration_dry: int = Form(3200),
+    calibration_wet: int = Form(1400),
+):
+    """Add a new sensor and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    add_sensor(plant_id, calibration_dry, calibration_wet)
+    return RedirectResponse("/manage/sensors", status_code=303)
+
+
+@app.post("/manage/sensors/{sensor_id}/edit")
+async def manage_sensors_edit(
+    request: Request,
+    sensor_id: int,
+    plant_id: int = Form(...),
+    calibration_dry: int = Form(3200),
+    calibration_wet: int = Form(1400),
+):
+    """Update a sensor's config and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    update_sensor(sensor_id, plant_id, calibration_dry, calibration_wet)
+    return RedirectResponse("/manage/sensors", status_code=303)
+
+
+@app.post("/manage/sensors/{sensor_id}/delete")
+async def manage_sensors_delete(request: Request, sensor_id: int):
+    """Deactivate a sensor and redirect back."""
+    if not _get_user(request):
+        return _auth_failed_response(request)
+
+    delete_sensor(sensor_id)
+    return RedirectResponse("/manage/sensors", status_code=303)

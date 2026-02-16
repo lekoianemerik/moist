@@ -316,7 +316,7 @@ The full DDL (tables, indexes, views, seed data, dummy readings, RLS) is in `sup
 Key design decisions:
 
 - **Sensor and plant are separate tables** — a sensor can be reassigned to a different plant without losing history.
-- **Append-only with timestamps** — plants and sensors tables are never updated. A new row with a fresh timestamp represents the current config. Views (`current_plants`, `current_sensors`) always return the latest row per ID.
+- **Append-only with timestamps** — plants and sensors tables are never updated. A new row with a fresh timestamp represents the current config. Views (`current_plants`, `current_sensors`) always return the latest active row per ID. Removal is a soft-delete: append a row with `is_active = false`.
 - **Both raw and calibrated readings** — `moisture_raw` (ADC value) and `moisture_pct` (0–100%) are stored so recalibration doesn't retroactively change historical data.
 - **Integer IDs** — `plant_id` and `sensor_id` are integers (1, 2, 3, 4), not strings.
 
@@ -377,6 +377,14 @@ def predict_days_until_watering(
 | `/logout` | POST | No | Clear session, redirect to login |
 | `/` | GET | Yes | Main dashboard — all plant cards |
 | `/api/plant/{plant_id}` | GET | Yes | Single plant card partial (HTMX) |
+| `/manage/plants` | GET | Yes | Plant management page (list, add, edit, remove) |
+| `/manage/plants/add` | POST | Yes | Add a new plant |
+| `/manage/plants/{plant_id}/edit` | POST | Yes | Update plant metadata |
+| `/manage/plants/{plant_id}/delete` | POST | Yes | Deactivate a plant |
+| `/manage/sensors` | GET | Yes | Sensor management page (list, add, edit, remove) |
+| `/manage/sensors/add` | POST | Yes | Add a new sensor |
+| `/manage/sensors/{sensor_id}/edit` | POST | Yes | Update sensor config |
+| `/manage/sensors/{sensor_id}/delete` | POST | Yes | Deactivate a sensor |
 | `/health` | GET | No | Healthcheck for Railway |
 
 ### Deploy to Railway
