@@ -43,15 +43,22 @@
         </select>
       </div>
       <div class="w-32">
-        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. dry (ADC)</label>
-        <input type="number" name="calibration_dry" value="3200" min="0" max="4095"
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. air (ADC)</label>
+        <input type="number" name="calibration_air" value="3200" min="0" max="4095"
           class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
                  dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
                  focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
       </div>
       <div class="w-32">
-        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. wet (ADC)</label>
-        <input type="number" name="calibration_wet" value="1400" min="0" max="4095"
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. water (ADC)</label>
+        <input type="number" name="calibration_water" value="1400" min="0" max="4095"
+          class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+      </div>
+      <div class="w-32">
+        <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. soil (ADC)</label>
+        <input type="number" name="calibration_soil" value="2200" min="0" max="4095"
           class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
                  dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
                  focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
@@ -97,15 +104,22 @@
           </select>
         </div>
         <div class="w-32">
-          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. dry (ADC)</label>
-          <input type="number" name="calibration_dry" value="{{ sensor.calibration_dry }}" min="0" max="4095"
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. air (ADC)</label>
+          <input type="number" name="calibration_air" value="{{ sensor.calibration_air }}" min="0" max="4095"
             class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
                    dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
         </div>
         <div class="w-32">
-          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. wet (ADC)</label>
-          <input type="number" name="calibration_wet" value="{{ sensor.calibration_wet }}" min="0" max="4095"
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. water (ADC)</label>
+          <input type="number" name="calibration_water" value="{{ sensor.calibration_water }}" min="0" max="4095"
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
+                   dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
+                   focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+        </div>
+        <div class="w-32">
+          <label class="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Cal. soil (ADC)</label>
+          <input type="number" name="calibration_soil" value="{{ sensor.calibration_soil }}" min="0" max="4095"
             class="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm
                    dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100
                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50">

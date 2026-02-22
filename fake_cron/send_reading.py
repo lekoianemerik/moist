@@ -49,8 +49,8 @@ DEFAULT_INIT_BATTERY = 90.0
 def get_active_sensors(supabase) -> list[dict]:
     """Fetch active sensors from the current_sensors view.
 
-    Returns a list of dicts with sensor_id, calibration_dry, calibration_wet.
-    The view already filters is_active = true.
+    Returns a list of dicts with sensor_id, calibration_air, calibration_water,
+    calibration_soil.  The view already filters is_active = true.
     """
     res = supabase.table("current_sensors").select("*").order("sensor_id").execute()
     return res.data
@@ -117,10 +117,14 @@ def next_reading(sensor_id: int, sensor_cfg: dict, state: dict) -> dict:
     battery -= random.uniform(0.005, 0.015)
     battery = round(max(5.0, min(100.0, battery)), 0)
 
-    # Compute raw ADC from moisture %
-    cal_dry = sensor_cfg["calibration_dry"]
-    cal_wet = sensor_cfg["calibration_wet"]
-    raw = int(cal_dry - (moisture / 100.0) * (cal_dry - cal_wet))
+    # Compute raw ADC from moisture % (piecewise linear, inverse of 3-point calibration)
+    cal_air = sensor_cfg["calibration_air"]
+    cal_water = sensor_cfg["calibration_water"]
+    cal_soil = sensor_cfg["calibration_soil"]
+    if moisture <= 50:
+        raw = int(cal_air - (moisture / 50.0) * (cal_air - cal_soil))
+    else:
+        raw = int(cal_soil - ((moisture - 50) / 50.0) * (cal_soil - cal_water))
 
     # Persist new state
     s["moisture"] = moisture

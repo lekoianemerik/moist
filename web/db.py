@@ -380,8 +380,9 @@ class PlantConfig:
 class SensorConfig:
     sensor_id: int
     plant_id: int
-    calibration_dry: int
-    calibration_wet: int
+    calibration_air: int
+    calibration_water: int
+    calibration_soil: int
 
 
 # ---------------------------------------------------------------------------
@@ -487,8 +488,9 @@ def delete_plant(plant_id: int) -> None:
         client.table("sensors").insert({
             "sensor_id": s["sensor_id"],
             "plant_id": s["plant_id"],
-            "calibration_dry": s["calibration_dry"],
-            "calibration_wet": s["calibration_wet"],
+            "calibration_air": s["calibration_air"],
+            "calibration_water": s["calibration_water"],
+            "calibration_soil": s["calibration_soil"],
             "is_active": False,
         }).execute()
 
@@ -506,8 +508,9 @@ def get_all_sensor_configs() -> list[SensorConfig]:
         SensorConfig(
             sensor_id=r["sensor_id"],
             plant_id=r["plant_id"],
-            calibration_dry=r["calibration_dry"],
-            calibration_wet=r["calibration_wet"],
+            calibration_air=r["calibration_air"],
+            calibration_water=r["calibration_water"],
+            calibration_soil=r["calibration_soil"],
         )
         for r in res.data
     ]
@@ -515,8 +518,9 @@ def get_all_sensor_configs() -> list[SensorConfig]:
 
 def add_sensor(
     plant_id: int,
-    calibration_dry: int,
-    calibration_wet: int,
+    calibration_air: int,
+    calibration_water: int,
+    calibration_soil: int,
 ) -> None:
     """Add a new sensor with an auto-generated sensor_id."""
     client = _get_data_client()
@@ -525,8 +529,9 @@ def add_sensor(
     client.table("sensors").insert({
         "sensor_id": next_id,
         "plant_id": plant_id,
-        "calibration_dry": calibration_dry,
-        "calibration_wet": calibration_wet,
+        "calibration_air": calibration_air,
+        "calibration_water": calibration_water,
+        "calibration_soil": calibration_soil,
         "is_active": True,
     }).execute()
 
@@ -534,16 +539,18 @@ def add_sensor(
 def update_sensor(
     sensor_id: int,
     plant_id: int,
-    calibration_dry: int,
-    calibration_wet: int,
+    calibration_air: int,
+    calibration_water: int,
+    calibration_soil: int,
 ) -> None:
     """Update a sensor's config by appending a new row."""
     client = _get_data_client()
     client.table("sensors").insert({
         "sensor_id": sensor_id,
         "plant_id": plant_id,
-        "calibration_dry": calibration_dry,
-        "calibration_wet": calibration_wet,
+        "calibration_air": calibration_air,
+        "calibration_water": calibration_water,
+        "calibration_soil": calibration_soil,
         "is_active": True,
     }).execute()
 
@@ -563,7 +570,8 @@ def delete_sensor(sensor_id: int) -> None:
     client.table("sensors").insert({
         "sensor_id": sensor_id,
         "plant_id": s["plant_id"],
-        "calibration_dry": s["calibration_dry"],
-        "calibration_wet": s["calibration_wet"],
+        "calibration_air": s["calibration_air"],
+        "calibration_water": s["calibration_water"],
+        "calibration_soil": s["calibration_soil"],
         "is_active": False,
     }).execute()

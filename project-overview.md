@@ -104,7 +104,14 @@ void loop() {
   int raw = analogRead(SENSOR_PIN);
   digitalWrite(SENSOR_POWER, LOW);
 
-  float moisture = map(raw, 3200, 1400, 0, 100);  // calibrate these values
+  // 3-point calibration: air (~3200)=0%, soil (~2200)=50%, water (~1400)=100%
+  // Use piecewise linear mapping on the ESP32 or let the Pi compute moisture %
+  float moisture;
+  if (raw >= 2200) {
+    moisture = 50.0 * (3200 - raw) / (3200 - 2200);
+  } else {
+    moisture = 50.0 + 50.0 * (2200 - raw) / (2200 - 1400);
+  }
   moisture = constrain(moisture, 0, 100);
 
   Serial.printf("Raw: %d | Moisture: %.1f%%\n", raw, moisture);
@@ -112,11 +119,15 @@ void loop() {
 }
 ```
 
-**Calibration:**
+**Calibration (3-point, via MQTT):**
 
-1. Record the raw ADC value with the sensor in air → this is your 0% (dry) reference.
-2. Insert sensor into a glass of water (up to the line) → this is your 100% (saturated) reference.
-3. Replace the `3200` and `1400` magic numbers above with your actual values.
+Use the `calibration/calibration.py` script on the Raspberry Pi while the ESP32 publishes raw ADC values over MQTT every ~1 second. The script walks through three conditions:
+
+1. **Air** — sensor held in open air → 0% moisture reference (highest ADC value, ~3200)
+2. **Water** — sensor submerged in water up to the line → 100% moisture reference (lowest ADC value, ~1400)
+3. **Soil** — sensor inserted in fresh potting soil → 50% moisture reference (mid-range ADC value, ~2200)
+
+The mapping uses piecewise linear interpolation with two segments (air→soil and soil→water), which corrects for the sensor's non-linear response. Enter the three raw ADC values into the web dashboard (Manage Sensors page).
 
 ### Stage 2 — ESP32 → MQTT → Raspberry Pi (hardware required)
 

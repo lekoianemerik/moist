@@ -68,13 +68,14 @@ plants (append-only config)
 └── created_at      timestamptz         -- version timestamp
 
 sensors (append-only config)
-├── id              bigint identity PK
-├── sensor_id       integer             -- logical identifier (1, 2, 3, 4)
-├── plant_id        integer             -- which plant this sensor is assigned to
-├── calibration_dry integer             -- raw ADC value at 0% (air, ~3200)
-├── calibration_wet integer             -- raw ADC value at 100% (water, ~1400)
-├── is_active       boolean             -- false = soft-deleted (views exclude these)
-└── created_at      timestamptz         -- version timestamp
+├── id                bigint identity PK
+├── sensor_id         integer             -- logical identifier (1, 2, 3, 4)
+├── plant_id          integer             -- which plant this sensor is assigned to
+├── calibration_air   integer             -- raw ADC value: sensor in air (~3200, 0%)
+├── calibration_water integer             -- raw ADC value: sensor in water (~1400, 100%)
+├── calibration_soil  integer             -- raw ADC value: sensor in dry soil (~2200, 50%)
+├── is_active         boolean             -- false = soft-deleted (views exclude these)
+└── created_at        timestamptz         -- version timestamp
 
 readings (time-series)
 ├── id              bigint identity PK
@@ -207,6 +208,15 @@ All dashboard and HTMX partial responses include `Cache-Control: no-store` heade
 ## File reference
 
 ```
+calibration/                     # Sensor calibration tool (runs on Raspberry Pi)
+├── calibration.py               # Interactive 3-point calibration via MQTT
+│                                #   Subscribes to sensor MQTT topic
+│                                #   Walks through air/water/soil conditions
+│                                #   Collects readings, computes median per condition
+│                                #   Prints values to enter into web dashboard
+├── requirements.txt             # paho-mqtt
+└── README.md                    # Setup + usage instructions
+
 fake_cron/                       # Fake sensor cron job (runs on Raspberry Pi)
 ├── send_reading.py              # Discovers active sensors from Supabase, inserts fake readings
 │                                #   Persists state to state.json between runs

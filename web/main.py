@@ -265,14 +265,15 @@ async def manage_sensors_page(request: Request):
 async def manage_sensors_add(
     request: Request,
     plant_id: int = Form(...),
-    calibration_dry: int = Form(3200),
-    calibration_wet: int = Form(1400),
+    calibration_air: int = Form(3200),
+    calibration_water: int = Form(1400),
+    calibration_soil: int = Form(2200),
 ):
     """Add a new sensor and redirect back."""
     if not _get_user(request):
         return _auth_failed_response(request)
 
-    add_sensor(plant_id, calibration_dry, calibration_wet)
+    add_sensor(plant_id, calibration_air, calibration_water, calibration_soil)
     return RedirectResponse("/manage/sensors", status_code=303)
 
 
@@ -281,14 +282,15 @@ async def manage_sensors_edit(
     request: Request,
     sensor_id: int,
     plant_id: int = Form(...),
-    calibration_dry: int = Form(3200),
-    calibration_wet: int = Form(1400),
+    calibration_air: int = Form(3200),
+    calibration_water: int = Form(1400),
+    calibration_soil: int = Form(2200),
 ):
     """Update a sensor's config and redirect back."""
     if not _get_user(request):
         return _auth_failed_response(request)
 
-    update_sensor(sensor_id, plant_id, calibration_dry, calibration_wet)
+    update_sensor(sensor_id, plant_id, calibration_air, calibration_water, calibration_soil)
     return RedirectResponse("/manage/sensors", status_code=303)
 
 

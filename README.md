@@ -17,6 +17,7 @@ Soil humidity monitoring system for houseplants. Tracks moisture levels, battery
 | Railway deployment | Ready -- `railway.toml` configured, needs env vars |
 | Fake sensor cron job (Raspberry Pi) | Done -- `fake_cron/` discovers sensors dynamically from Supabase |
 | MQTT pipeline (real sensors) | Not started |
+| Sensor calibration script (Raspberry Pi) | Done -- `calibration/` 3-point calibration via MQTT |
 | ESP32 firmware | Waiting for hardware |
 
 ## Tech stack
@@ -40,6 +41,10 @@ moist/
 ├── architecture.md            # Data model, auth flow, deployment architecture
 ├── supabase/
 │   └── schema.sql             # DDL + seed data + dummy readings (run in SQL Editor)
+├── calibration/               # Sensor calibration tool (runs on Raspberry Pi)
+│   ├── calibration.py         # Interactive 3-point calibration via MQTT
+│   ├── requirements.txt       # Python dependencies (paho-mqtt)
+│   └── README.md              # Setup + usage instructions
 ├── fake_cron/                 # Fake sensor cron job (runs on Raspberry Pi)
 │   ├── send_reading.py        # Discovers active sensors from Supabase, inserts fake readings
 │   ├── requirements.txt       # Python dependencies (supabase, python-dotenv)

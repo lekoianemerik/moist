@@ -20,13 +20,14 @@ CREATE TABLE plants (
 
 -- sensors (append-only: latest row per sensor_id = current config)
 CREATE TABLE sensors (
-    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    sensor_id       INTEGER NOT NULL,
-    plant_id        INTEGER NOT NULL,
-    calibration_dry INTEGER NOT NULL,   -- raw ADC reading at 0% moisture (dry / air)
-    calibration_wet INTEGER NOT NULL,   -- raw ADC reading at 100% moisture (water)
-    is_active       BOOLEAN NOT NULL DEFAULT true,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sensor_id         INTEGER NOT NULL,
+    plant_id          INTEGER NOT NULL,
+    calibration_air   INTEGER NOT NULL,   -- raw ADC value: sensor in air (~3200, 0%)
+    calibration_water INTEGER NOT NULL,   -- raw ADC value: sensor in water (~1400, 100%)
+    calibration_soil  INTEGER NOT NULL,   -- raw ADC value: sensor in dry soil (~2200, 50%)
+    is_active         BOOLEAN NOT NULL DEFAULT true,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- readings (time-series, append-only)
@@ -67,11 +68,11 @@ INSERT INTO plants (plant_id, plant_name, plant_position, ideal_min, ideal_max, 
     (3, 'Desk Succulent',   'Office desk',        10, 25, 10),
     (4, 'Balcony Tomato',   'Balcony planter',    50, 70, 35);
 
-INSERT INTO sensors (sensor_id, plant_id, calibration_dry, calibration_wet) VALUES
-    (1, 1, 3200, 1400),
-    (2, 2, 3100, 1350),
-    (3, 3, 3250, 1450),
-    (4, 4, 3150, 1380);
+INSERT INTO sensors (sensor_id, plant_id, calibration_air, calibration_water, calibration_soil) VALUES
+    (1, 1, 3200, 1400, 2200),
+    (2, 2, 3100, 1350, 2150),
+    (3, 3, 3250, 1450, 2250),
+    (4, 4, 3150, 1380, 2180);
 
 -- 5. Dummy readings (7 days, every 30 min, 4 sensors) --------
 --
@@ -82,8 +83,12 @@ INSERT INTO readings (sensor_id, moisture_raw, moisture_pct, battery, recorded_a
 SELECT
     s.sensor_id,
 
-    -- raw ADC: interpolate between calibration endpoints
-    (s.cal_dry - (pct / 100.0) * (s.cal_dry - s.cal_wet))::INTEGER,
+    -- raw ADC: piecewise linear (reverse mapping from moisture %)
+    -- 0-50% maps to cal_air..cal_soil, 50-100% maps to cal_soil..cal_water
+    CASE
+        WHEN pct <= 50 THEN (s.cal_air - (pct / 50.0) * (s.cal_air - s.cal_soil))::INTEGER
+        ELSE (s.cal_soil - ((pct - 50) / 50.0) * (s.cal_soil - s.cal_water))::INTEGER
+    END,
 
     -- calibrated moisture %
     ROUND(pct::NUMERIC, 1)::REAL,
@@ -100,11 +105,11 @@ FROM
     ) AS t
 CROSS JOIN (
     VALUES
-        (1, 3200, 1400, 72.0, 8.0),
-        (2, 3100, 1350, 80.0, 6.0),
-        (3, 3250, 1450, 35.0, 3.0),
-        (4, 3150, 1380, 65.0, 10.0)
-) AS s(sensor_id, cal_dry, cal_wet, start_moisture, daily_drop)
+        (1, 3200, 1400, 2200, 72.0, 8.0),
+        (2, 3100, 1350, 2150, 80.0, 6.0),
+        (3, 3250, 1450, 2250, 35.0, 3.0),
+        (4, 3150, 1380, 2180, 65.0, 10.0)
+) AS s(sensor_id, cal_air, cal_water, cal_soil, start_moisture, daily_drop)
 CROSS JOIN LATERAL (
     SELECT EXTRACT(EPOCH FROM (now() - t)) / 86400.0 AS age_days
 ) AS a
